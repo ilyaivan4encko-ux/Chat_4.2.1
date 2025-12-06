@@ -1,0 +1,647 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>P2P Mobile Chat — Auth, Rooms, PM, Avatars, Images, Voice</title>
+
+<!-- ========= STYLES (mobile-first, polished UI) ========= -->
+<style>
+:root{
+  --bg:#071025;
+  --card:#0f1620;
+  --muted:#97a6b2;
+  --accent:#36c1ff;
+  --accent2:#6ef0c0;
+  --bubble-self:linear-gradient(135deg,#4b9cff33,#36c1ff22);
+  --bubble-other:linear-gradient(180deg,#0f1720,#0b1220);
+  --glass: rgba(255,255,255,0.03);
+  --radius:16px;
+  --max-width:480px;
+}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#03060a);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#e6f0f6;-webkit-font-smoothing:antialiased}
+.app{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
+.shell{width:100%;max-width:var(--max-width);height:100vh;border-radius:18px;background:linear-gradient(180deg,var(--card),#071017);box-shadow:0 20px 60px rgba(3,7,12,0.6);overflow:hidden;display:flex;flex-direction:column;}
+
+/* HEADER */
+.header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.02)}
+.logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#021229}
+.h-title{font-weight:700;font-size:16px}
+.h-sub{font-size:12px;color:var(--muted)}
+
+/* MAIN AREA */
+.main{flex:1;display:flex;flex-direction:column;padding:12px;box-sizing:border-box;min-height:0}
+
+/* AUTH CARD */
+.auth-card{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:18px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.45);display:flex;flex-direction:column;gap:12px;align-items:stretch}
+.avatar-large{width:96px;height:96px;border-radius:18px;margin:6px auto;background:#09161f;background-size:cover;background-position:center;border:3px solid rgba(255,255,255,0.03)}
+.center{text-align:center}
+.input-row{display:flex;gap:8px}
+.input{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:16px}
+.btn{padding:12px;border-radius:12px;border:none;background:linear-gradient(90deg,var(--accent),#58a6ff);color:#02122a;font-weight:800}
+.link{background:transparent;border:none;color:var(--accent);font-weight:700}
+
+/* show password toggle */
+.pass-wrap{position:relative;display:flex;align-items:center}
+.show-pass{position:absolute;right:10px;cursor:pointer;color:var(--muted);font-size:13px;padding:6px}
+
+/* APP UI */
+.app-shell{display:flex;flex-direction:column;height:100%}
+.top-controls{display:flex;gap:8px;align-items:center;padding:8px}
+.rooms{display:flex;gap:8px;flex:1;align-items:center}
+.rooms select,input{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+.users-panel{width:110px;background:rgba(255,255,255,0.02);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px;height:calc(100vh - 200px);overflow:auto}
+.users-panel .u{display:flex;gap:8px;align-items:center;padding:6px;border-radius:8px}
+.u .ua{width:36px;height:36px;border-radius:8px;background-size:cover;background-position:center}
+.u .uname{font-size:13px;flex:1}
+
+/* MESSAGES */
+.chat-wrap{flex:1;display:flex;gap:12px;min-height:0}
+.left{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.msgs{flex:1;overflow:auto;padding:12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);min-height:0}
+.msg{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;max-width:85%}
+.msg .avatar{width:44px;height:44px;border-radius:12px;background-size:cover;background-position:center;flex-shrink:0}
+.msg .bubble{padding:10px 12px;border-radius:12px;background:var(--bubble-other);color:var(--text);box-shadow:0 4px 14px rgba(2,6,12,0.45);line-height:1.3}
+.msg.me{margin-left:auto;flex-direction:row-reverse}
+.msg.me .bubble{background:var(--bubble-self);color:#021229}
+.msg .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+.msg.system{justify-content:center;color:var(--muted);font-style:italic}
+
+/* bubble media */
+.msg img{max-width:220px;border-radius:10px;margin-top:6px;display:block}
+
+/* COMPOSER (fixed at bottom of container area) */
+.composer{display:flex;gap:8px;padding:10px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+.input-msg{flex:1;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);background:transparent}
+.btn-attach{padding:10px;border-radius:10px;border:none;background:rgba(255,255,255,0.03);font-size:18px}
+.btn-send{padding:12px 14px;border-radius:12px;border:none;background:linear-gradient(90deg,var(--accent),#58a6ff);color:#02122a;font-weight:800}
+
+/* small */
+.small{font-size:12px;color:var(--muted)}
+
+/* File input hide */
+.fileInput{display:none}
+
+/* animations */
+.fade-in{animation:fadeIn .6s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* responsive tweaks for larger screens */
+@media(min-width:900px){
+  .shell{height:92vh}
+  .users-panel{width:180px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="shell">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="logo">P2</div>
+      <div>
+        <div class="h-title">P2P Mobile Chat</div>
+        <div class="h-sub">Авторизация • Комнаты • PM • Аватары • Голос • Изображения</div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+
+      <!-- AUTH CARD -->
+      <div id="authCard" class="auth-card fade-in" aria-live="polite">
+        <div id="avatarLarge" class="avatar-large" title="Аватар"></div>
+        <div class="center">
+          <div style="font-weight:800;font-size:18px">Добро пожаловать</div>
+          <div class="small" style="margin-top:6px">Войдите или создайте аккаунт. Логин будет вашим ником.</div>
+        </div>
+
+        <div class="input-row">
+          <input id="login" class="input" placeholder="Логин (ник)" autocapitalize="off" />
+        </div>
+
+        <div class="pass-wrap">
+          <input id="password" type="password" class="input" placeholder="Пароль" />
+          <div id="showPass" class="show-pass">Показать</div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button id="btnAuth" class="btn">Войти</button>
+          <button id="btnToggleReg" class="link">Регистрация</button>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btnAvatar" class="smallBtn">Загрузить аватар</button>
+          <select id="presetAvatar" class="input" style="max-width:50%">
+            <option value="">Выбрать аватар</option>
+            <option value="https://i.imgur.com/1Q0vXgD.png">Рыцарь</option>
+            <option value="https://i.imgur.com/pR8Y9qe.png">Колдун</option>
+            <option value="https://i.imgur.com/8w4Y1Hz.png">Лучник</option>
+            <option value="https://i.imgur.com/7VJ7u8Z.png">Вор</option>
+          </select>
+          <div style="margin-left:auto" id="authMsg" class="small"></div>
+        </div>
+
+        <input type="file" id="avatarFile" class="fileInput" accept="image/*" />
+      </div>
+
+      <!-- APP (hidden until login) -->
+      <div id="appUI" style="display:none" class="app-shell">
+        <div class="top-controls">
+          <div class="rooms">
+            <select id="roomsList" class="input"></select>
+            <input id="newRoom" class="input" placeholder="Новая комната" style="max-width:140px" />
+            <button id="btnCreateRoom" class="smallBtn">Создать</button>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div id="meLabel" class="small"></div>
+            <button id="btnLogout" class="smallBtn">Выйти</button>
+          </div>
+        </div>
+
+        <div class="chat-wrap">
+          <div class="left">
+            <div id="msgs" class="msgs" aria-live="polite"></div>
+
+            <div style="padding:8px" class="composer">
+              <input id="inputMsg" class="input-msg" type="text" placeholder="Сообщение..." />
+              <input id="pmTo" class="input" placeholder="PM кому (ник) — опц." style="max-width:140px" />
+              <label for="fileImg" class="btn-attach smallBtn" title="Отправить изображение">📷</label>
+              <input id="fileImg" class="fileInput" type="file" accept="image/*" />
+              <button id="voiceBtn" class="btn-attach smallBtn" title="Записать голос">🎙</button>
+              <button id="btnSend" class="btn-send">Отправить</button>
+            </div>
+          </div>
+
+          <div class="users-panel">
+            <div style="font-weight:800">Онлайн</div>
+            <div id="usersList"></div>
+            <div style="margin-top:auto;font-size:12px;color:var(--muted)">Peers: <span id="peersCount">0</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- LIBRARIES -->
+<script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/webtorrent-tracker/client.min.js"></script>
+
+<!-- ========== JAVASCRIPT: полный функционал (auth, P2P, chat, files, voice, UI) ========== -->
+<script>
+/* ===========================================================
+   P2P Mobile Chat — single-file implementation
+   Features:
+   - Registration / Login (login == nick), password SHA-256 stored locally
+   - Avatar upload or preset avatar
+   - Rooms management (create/select)
+   - P2P (Simple-Peer + WebTorrent trackers) discovery
+   - Presence (online) announcements
+   - Local history per room (localStorage), history sync via peers
+   - Text messages, PMs, images, voice notes
+   - Mobile-first UI, animations, show-password toggle
+   =========================================================== */
+
+/* ----------------------
+   Helper utilities
+   ---------------------- */
+function el(id){ return document.getElementById(id); }
+function now(){ return Date.now(); }
+function uid(n=8){ return Math.random().toString(36).slice(2,2+n); }
+async function sha256(str){
+  const buf = new TextEncoder().encode(str);
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsDataURL(file); })}
+
+/* ----------------------
+   Storage keys & state
+   ---------------------- */
+const USERS_KEY = 'p2p_users_v1';
+const PROFILE_KEY = 'p2p_profile_v1';
+const ROOMS_KEY = 'p2p_rooms_v1';
+const HISTORY_PREFIX = 'p2p_hist_'; // HISTORY_PREFIX + roomName
+
+let me = { login:null, avatar:null, clientId: uid(10) };
+let peers = []; // SimplePeer instances
+let peerInfos = {}; // clientId -> {name, avatar, lastSeen}
+let currentRoom = 'lobby';
+let trackerClient = null;
+
+/* ----------------------
+   UI refs
+   ---------------------- */
+const authCard = el('authCard'), avatarLarge = el('avatarLarge');
+const loginInput = el('login'), passInput = el('password'), btnAuth = el('btnAuth'), btnToggleReg = el('btnToggleReg');
+const btnAvatar = el('btnAvatar'), avatarFile = el('avatarFile'), presetAvatar = el('presetAvatar'), authMsg = el('authMsg');
+const showPass = el('showPass');
+
+const appUI = el('appUI'), meLabel = el('meLabel'), btnLogout = el('btnLogout');
+const roomsList = el('roomsList'), newRoomInput = el('newRoom'), btnCreateRoom = el('btnCreateRoom');
+const msgsDiv = el('msgs'), inputMsg = el('inputMsg'), btnSend = el('btnSend'), pmTo = el('pmTo');
+const usersList = el('usersList'), peersCount = el('peersCount');
+const fileImg = el('fileImg'), voiceBtn = el('voiceBtn');
+
+/* ----------------------
+   Init: load saved profile & rooms
+   ---------------------- */
+(function init(){
+  try{
+    const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+    if(p && p.login){ me.login = p.login; me.avatar = p.avatar || null; me.clientId = p.clientId || me.clientId; loginInput.value = me.login; if(me.avatar) avatarLarge.style.backgroundImage = `url(${me.avatar})`; }
+  }catch(e){}
+  loadRooms();
+  // pre-populate rooms select
+})();
+
+/* ----------------------
+   AUTH: registration / login
+   ---------------------- */
+let regMode = false;
+btnToggleReg.addEventListener('click', ()=>{
+  regMode = !regMode;
+  btnAuth.textContent = regMode ? 'Создать аккаунт' : 'Войти';
+  btnToggleReg.textContent = regMode ? 'У меня есть аккаунт' : 'Регистрация';
+  authMsg.textContent = '';
+});
+
+btnAuth.addEventListener('click', async ()=>{
+  const login = loginInput.value.trim();
+  const pass = passInput.value;
+  if(!login || !pass){ authMsg.style.color='var(--danger)'; authMsg.textContent='Заполните логин и пароль'; return; }
+
+  const users = JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+
+  if(regMode){
+    if(users[login]){ authMsg.style.color='var(--danger)'; authMsg.textContent='Логин занят'; return; }
+    const h = await sha256(pass);
+    users[login] = { pass: h, avatar: me.avatar || null, created: now() };
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    authMsg.style.color='var(--accent2)'; authMsg.textContent='Аккаунт создан — войдите';
+    regMode = false; btnAuth.textContent='Войти'; btnToggleReg.textContent='Регистрация';
+    return;
+  } else {
+    const u = users[login];
+    if(!u){ authMsg.style.color='var(--danger)'; authMsg.textContent='Пользователь не найден'; return; }
+    const h = await sha256(pass);
+    if(h !== u.pass){ authMsg.style.color='var(--danger)'; authMsg.textContent='Неверный пароль'; return; }
+    me.login = login; me.avatar = me.avatar || u.avatar || null;
+    saveProfile();
+    enterApp();
+  }
+});
+
+function saveProfile(){ localStorage.setItem(PROFILE_KEY, JSON.stringify({ login: me.login, avatar: me.avatar, clientId: me.clientId })); }
+
+/* show password toggle */
+showPass.addEventListener('click', ()=>{
+  if(passInput.type === 'password'){ passInput.type='text'; showPass.textContent='Скрыть'; }
+  else { passInput.type='password'; showPass.textContent='Показать'; }
+});
+
+/* avatar upload */
+btnAvatar.addEventListener('click', ()=> avatarFile.click());
+avatarFile.addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const data = await fileToDataURL(f);
+  me.avatar = data; avatarLarge.style.backgroundImage = `url(${data})`; saveProfile();
+});
+presetAvatar.addEventListener('change', ()=>{
+  const v = presetAvatar.value; if(!v) return;
+  me.avatar = v; avatarLarge.style.backgroundImage = `url(${v})`; saveProfile();
+});
+
+/* ----------------------
+   Rooms management
+   ---------------------- */
+function loadRooms(){
+  const defaults = ['lobby','general','trading','support'];
+  const local = JSON.parse(localStorage.getItem(ROOMS_KEY) || '[]');
+  const rooms = Array.from(new Set([...defaults, ...local]));
+  roomsList.innerHTML = '';
+  rooms.forEach(r=>{ const opt = document.createElement('option'); opt.value=r; opt.textContent=r; roomsList.appendChild(opt); });
+  if(!rooms.includes(currentRoom)) currentRoom = rooms[0];
+  roomsList.value = currentRoom;
+}
+btnCreateRoom.addEventListener('click', ()=>{
+  const name = newRoomInput.value.trim(); if(!name) return;
+  const arr = JSON.parse(localStorage.getItem(ROOMS_KEY) || '[]'); if(!arr.includes(name)) arr.push(name);
+  localStorage.setItem(ROOMS_KEY, JSON.stringify(arr)); newRoomInput.value=''; loadRooms();
+});
+
+/* ----------------------
+   History storage helpers
+   ---------------------- */
+function historyKey(room){ return HISTORY_PREFIX + room; }
+function saveMessageToHistory(room,msg){
+  try{
+    const key = historyKey(room);
+    const arr = JSON.parse(localStorage.getItem(key) || '[]');
+    arr.push(msg);
+    if(arr.length > 500) arr.splice(0, arr.length - 500);
+    localStorage.setItem(key, JSON.stringify(arr));
+  }catch(e){ console.warn('hist save', e); }
+}
+function loadHistoryToUI(){
+  msgsDiv.innerHTML = '';
+  try{
+    const arr = JSON.parse(localStorage.getItem(historyKey(currentRoom)) || '[]');
+    arr.forEach(m=> renderMsg(m));
+  }catch(e){}
+}
+
+/* ----------------------
+   UI: render messages
+   ---------------------- */
+function renderMsg(msg){
+  // If PM and not for me -> skip
+  if(msg.to && msg.to !== me.login && msg.from !== me.login) return;
+  if(msg.room && msg.room !== currentRoom) return;
+
+  if(msg.type === 'system'){
+    const d = document.createElement('div'); d.className='msg system'; d.textContent = msg.txt; msgsDiv.appendChild(d); msgsDiv.scrollTop = msgsDiv.scrollHeight; return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg' + (msg.from === me.login ? ' me' : '');
+
+  const ava = document.createElement('div'); ava.className='avatar'; ava.style.backgroundImage = `url(${msg.avatar||'https://i.imgur.com/1Q0vXgD.png'})`;
+
+  const bubble = document.createElement('div'); bubble.className='bubble';
+  const meta = document.createElement('div'); meta.className='meta'; meta.textContent = `${msg.from}${msg.to ? ' → ' + msg.to : ''} • ${new Date(msg.time||now()).toLocaleTimeString()}`;
+
+  bubble.appendChild(meta);
+
+  if(msg.txt) { const p = document.createElement('div'); p.textContent = msg.txt; bubble.appendChild(p); }
+  if(msg.fileType && msg.fileType.startsWith('image/')) {
+    const img = document.createElement('img'); img.src = msg.dataUrl; img.addEventListener('click', ()=> window.open(msg.dataUrl, '_blank')); bubble.appendChild(img);
+  }
+  if(msg.fileType && msg.fileType.startsWith('audio/')) {
+    const btn = document.createElement('button'); btn.className='smallBtn'; btn.textContent='▶️ Прослушать голос';
+    btn.addEventListener('click', ()=> { const a = new Audio(msg.dataUrl); a.play(); });
+    bubble.appendChild(btn);
+  }
+
+  wrap.appendChild(ava); wrap.appendChild(bubble);
+  msgsDiv.appendChild(wrap);
+  msgsDiv.scrollTop = msgsDiv.scrollHeight;
+}
+
+/* ----------------------
+   P2P Implementation
+   ---------------------- */
+function roomHash(room){ return 'room_'+room.replace(/\s+/g,'_').toLowerCase() + '_v1'; }
+
+function startTrackerForRoom(room){
+  // cleanup previous
+  closeAllPeers();
+  peerInfos = {}; updateUsersUI();
+
+  const infoHash = roomHash(room);
+  trackerClient = new WebTorrentTracker.Client({
+    infoHash,
+    announce: [
+      "wss://tracker.openwebtorrent.com",
+      "wss://tracker.btorrent.xyz",
+      "wss://tracker.fastcast.nz"
+    ]
+  });
+
+  // outgoing peers discovered by tracker
+  trackerClient.on('peer', peer => {
+    const p = new SimplePeer({ initiator: true, trickle: false });
+
+    p.on('signal', data => {
+      try{ peer.send(JSON.stringify({ sdp: data, meta:{clientId: me.clientId, room: currentRoom} })); }catch(e){}
+    });
+
+    peer.on('data', d => {
+      try{ const dd = JSON.parse(d); if(dd.sdp) p.signal(dd.sdp); }catch(e){}
+    });
+
+    setupPeer(p);
+  });
+
+  // incoming signalling via tracker (someone sent sdp to us)
+  trackerClient.on('data', (peer, data) => {
+    try{
+      const d = JSON.parse(data);
+      const p = new SimplePeer({ initiator: false, trickle: false });
+      if(d.sdp) p.signal(d.sdp);
+      p.on('signal', sdp => { try{ peer.send(JSON.stringify({ sdp, meta:{clientId: me.clientId, room: currentRoom} })); }catch(e){} });
+      setupPeer(p);
+    }catch(e){ console.warn('tracker data err', e); }
+  });
+
+  trackerClient.scrape();
+}
+
+/* Setup SimplePeer events */
+function setupPeer(p){
+  p.on('connect', () => {
+    peers.push(p);
+    peersCount.textContent = String(peers.length);
+    // announce presence
+    sendPresence('join');
+  });
+
+  p.on('data', (data) => {
+    try{
+      const str = (typeof data === 'string')? data : new TextDecoder().decode(data);
+      const obj = JSON.parse(str);
+      handlePeerMessage(obj);
+    }catch(e){ console.warn('peer data decode', e); }
+  });
+
+  p.on('close', () => { peers = peers.filter(x=>x!==p); peersCount.textContent = String(peers.length); });
+  p.on('error', err => console.warn('peer err', err));
+}
+
+/* Broadcast object to all peers */
+function broadcast(obj){
+  const s = JSON.stringify(obj);
+  peers.forEach(p=>{ try{ p.send(s); }catch(e){} });
+}
+
+/* Close peers & tracker */
+function closeAllPeers(){
+  if(peers.length){ peers.forEach(p=>{ try{ p.destroy(); }catch(e){} }); peers = []; peersCount.textContent='0'; }
+  if(trackerClient){ try{ trackerClient.close(); }catch(e){} trackerClient=null; }
+}
+
+/* ----------------------
+   Message handling
+   ---------------------- */
+function handlePeerMessage(obj){
+  if(!obj || !obj.type) return;
+  if(obj.type === 'presence'){
+    peerInfos[obj.clientId] = { name: obj.name, avatar: obj.avatar, lastSeen: now(), clientId: obj.clientId };
+    updateUsersUI();
+  } else if(obj.type === 'chat'){
+    if(obj.room !== currentRoom) return;
+    const msg = { id: obj.id || uid(10), type:'chat', room: obj.room, from: obj.from, to: obj.to || null, avatar: obj.avatar, time: obj.time || now(), txt: obj.txt || null, fileType: obj.fileType || null, dataUrl: obj.dataUrl || null };
+    saveMessageToHistory(currentRoom, msg);
+    renderMsg(msg);
+  } else if(obj.type === 'requestHistory'){
+    // send our local history to requester
+    const hist = JSON.parse(localStorage.getItem(historyKey(obj.room)) || '[]').slice(-200);
+    const resp = { type:'historyResponse', room: obj.room, toClient: obj.fromClient, fromClient: me.clientId, history: hist };
+    broadcast(resp);
+  } else if(obj.type === 'historyResponse'){
+    if(obj.toClient !== me.clientId) return;
+    if(obj.room !== currentRoom) return;
+    const arr = obj.history || [];
+    arr.forEach(m=> saveMessageToHistory(currentRoom, m));
+    loadHistoryToUI();
+  } else if(obj.type === 'system'){
+    const sm = { type:'system', txt: obj.txt, time: now() };
+    renderMsg(sm);
+  }
+}
+
+/* ----------------------
+   Presence announcements
+   ---------------------- */
+let presenceInterval = null;
+function sendPresence(action='join'){
+  const p = { type:'presence', name: me.login, avatar: me.avatar, clientId: me.clientId, action, room: currentRoom, time: now() };
+  broadcast(p);
+  peerInfos[me.clientId] = { name: me.login, avatar: me.avatar, lastSeen: now(), clientId: me.clientId };
+  updateUsersUI();
+  if(!presenceInterval) presenceInterval = setInterval(()=> broadcast({ type:'presence', name: me.login, avatar: me.avatar, clientId: me.clientId, action:'alive', room: currentRoom, time: now() }), 9000);
+}
+
+/* ----------------------
+   Users UI
+   ---------------------- */
+function updateUsersUI(){
+  usersList.innerHTML = '';
+  const arr = Object.values(peerInfos).sort((a,b)=> (b.lastSeen||0)-(a.lastSeen||0));
+  arr.forEach(u=>{
+    const div = document.createElement('div'); div.className='u';
+    const ua = document.createElement('div'); ua.className='ua'; ua.style.backgroundImage = `url(${u.avatar||'https://i.imgur.com/1Q0vXgD.png'})`;
+    const uname = document.createElement('div'); uname.className='uname'; uname.textContent = u.name;
+    const dot = document.createElement('div'); dot.style.width='10px'; dot.style.height='10px'; dot.style.borderRadius='50%'; dot.style.background = ((now() - (u.lastSeen||0)) < 25000) ? 'lime' : 'gray';
+    div.appendChild(ua); div.appendChild(uname); div.appendChild(dot);
+    usersList.appendChild(div);
+  });
+  peersCount.textContent = String(peers.length);
+}
+
+/* ----------------------
+   Send message UI actions
+   ---------------------- */
+btnSend.addEventListener('click', sendTextMessage);
+inputMsg.addEventListener('keydown', e=>{ if(e.key === 'Enter') sendTextMessage(); });
+
+function sendTextMessage(){
+  const txt = inputMsg.value.trim(); const to = pmTo.value.trim() || null;
+  if(!txt) return;
+  const msg = { type:'chat', id: uid(10), room: currentRoom, from: me.login, to, avatar: me.avatar, time: now(), txt };
+  saveMessageToHistory(currentRoom, msg); renderMsg(msg); broadcast(msg); inputMsg.value='';
+}
+
+/* image sending */
+fileImg.addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  if(f.size > 3_500_000 && !confirm('Файл большой. Отправить?')) return;
+  const dataUrl = await fileToDataURL(f);
+  const to = pmTo.value.trim() || null;
+  const payload = { type:'chat', id: uid(10), room: currentRoom, from: me.login, to, avatar: me.avatar, time: now(), fileType: f.type, dataUrl };
+  saveMessageToHistory(currentRoom, payload); renderMsg(payload); broadcast(payload);
+  fileImg.value = '';
+});
+
+/* voice recording */
+let mediaRecorder = null, audioChunks = [];
+voiceBtn.addEventListener('click', async ()=>{
+  if(mediaRecorder && mediaRecorder.state === 'recording'){ mediaRecorder.stop(); voiceBtn.textContent='🎙'; return; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = async ()=>{
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const dataUrl = await fileToDataURL(blob);
+      const to = pmTo.value.trim() || null;
+      const payload = { type:'chat', id: uid(10), room: currentRoom, from: me.login, to, avatar: me.avatar, time: now(), fileType: blob.type, dataUrl };
+      saveMessageToHistory(currentRoom, payload); renderMsg(payload); broadcast(payload);
+    };
+    mediaRecorder.start(); voiceBtn.textContent='■ Остановить';
+  }catch(e){ alert('Ошибка доступа к микрофону: ' + (e.message||e)); }
+});
+
+/* request history on join */
+function requestHistoryFromPeers(){
+  const req = { type:'requestHistory', room: currentRoom, fromClient: me.clientId, time: now() };
+  broadcast(req);
+}
+
+/* ----------------------
+   Enter app after login
+   ---------------------- */
+function enterApp(){
+  authCard.style.display = 'none';
+  appUI.style.display = 'block';
+  meLabel.textContent = me.login;
+  if(me.avatar) avatarLarge.style.backgroundImage = `url(${me.avatar})`;
+  loadHistoryToUI();
+  startTrackerForRoom(currentRoom);
+  setTimeout(()=> requestHistoryFromPeers(), 1500);
+}
+
+/* logout */
+btnLogout.addEventListener('click', ()=>{ if(!confirm('Выйти?')) return; closeAllPeers(); localStorage.removeItem(PROFILE_KEY); location.reload(); });
+
+/* when room changes */
+roomsList.addEventListener('change', ()=>{
+  const newRoom = roomsList.value;
+  if(newRoom === currentRoom) return;
+  sendPresence('leave');
+  currentRoom = newRoom;
+  loadHistoryToUI();
+  startTrackerForRoom(currentRoom);
+  setTimeout(()=> requestHistoryFromPeers(), 1400);
+});
+
+/* Start tracker initial room after pressing Enter or login */
+function startTrackerAfterLogin(){
+  currentRoom = roomsList.value || currentRoom;
+}
+
+/* ----------------------
+   Helpers: load rooms/histories
+   ---------------------- */
+function loadRooms(){
+  const defaults = ['lobby','general','trading','support'];
+  const localRooms = JSON.parse(localStorage.getItem(ROOMS_KEY) || '[]');
+  const rooms = Array.from(new Set([...defaults, ...localRooms]));
+  roomsList.innerHTML = '';
+  rooms.forEach(r=> { const opt = document.createElement('option'); opt.value=r; opt.textContent=r; roomsList.appendChild(opt); });
+  if(!rooms.includes(currentRoom)) currentRoom = rooms[0];
+  roomsList.value = currentRoom;
+}
+
+/* ----------------------
+   Utils: when page hidden, send leave presence
+   ---------------------- */
+window.addEventListener('beforeunload', ()=> sendPresence('leave'));
+
+/* ----------------------
+   Initial binding: login via Enter
+   ---------------------- */
+loginInput.addEventListener('keydown', e=>{ if(e.key==='Enter') btnAuth.click(); });
+passInput.addEventListener('keydown', e=>{ if(e.key==='Enter') btnAuth.click(); });
+
+/* ===========================
+   End of script
+   =========================== */
+</script>
+</body>
+</html>
